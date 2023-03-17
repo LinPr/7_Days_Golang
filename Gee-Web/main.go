@@ -35,13 +35,31 @@ $ curl "http://localhost:9999/hello"
 */
 
 import (
+	"log"
 	"net/http"
+	"time"
 
 	gee "github.com/LinPr/Gee-Web/gee"
 )
 
+func onlyForV2() gee.HandlerFunc {
+	return func(c *gee.Context) {
+		// Start timer
+		t := time.Now()
+		// if a server error occurred
+		c.Fail(500, "Internal Server Error")
+		// Calculate resolution time
+		log.Printf("[%d] %s in %v for group v2", c.StatusCode, c.Req.RequestURI, time.Since(t))
+	}
+}
+
 func main() {
 	e := gee.NewEngine()
+	e.Use(gee.Logger())  // global midlleware
+	e.Use(gee.Logger1()) // global midlleware
+	e.GET("/", func(c *gee.Context) {
+		c.HTML(http.StatusOK, "<h1>Hello Gee</h1>")
+	})
 	e.GET("/index", func(c *gee.Context) {
 		c.HTML(http.StatusOK, "<h1>Index Page</h1>")
 	})
@@ -62,6 +80,7 @@ func main() {
 	}
 
 	v2 := e.NewGroup("/v2")
+	v2.Use(onlyForV2()) // v2 group middleware
 	{
 		v2.GET("/hello/:name/geektutu", func(c *gee.Context) {
 			// expect /hello/something/geektutu
