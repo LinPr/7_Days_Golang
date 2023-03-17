@@ -1,24 +1,95 @@
 package gee
 
-import "net/http"
+import (
+	"log"
+	"net/http"
+	"strings"
+)
 
 type router struct {
-	handlers map[string]HandlerFunc
+	// roots key eg, roots['GET'] roots['POST']
+	// handlers key eg, handlers['GET-/p/:lang/doc'], handlers['POST-/p/book']
+	roots    map[string]*node       // 从哈希表根据方法映射到不同的前缀树路由上
+	handlers map[string]HandlerFunc // 所有注册的回调函数
 }
 
 func newRouter() *router {
-	return &router{handlers: make(map[string]HandlerFunc)}
+	return &router{
+		roots:    make(map[string]*node),
+		handlers: make(map[string]HandlerFunc),
+	}
+}
+
+func parsePattern(pattern string) []string {
+	vs := strings.Split(pattern, "/")
+	parts := make([]string, 0)
+	for _, item := range vs {
+		if item != "" {
+			parts = append(parts, item)
+			if item[0] == '*' {
+				break
+			}
+		}
+	}
+	return parts
 }
 
 func (r *router) addRoute(method string, pattern string, handler HandlerFunc) {
+	parts := parsePattern(pattern)
+
 	key := method + "-" + pattern
+	_, ok := r.roots[method]
+	if !ok {
+		r.roots[method] = &node{}
+	}
+	r.roots[method].insert(pattern, parts, 0)
 	r.handlers[key] = handler
 }
 
+func (r *router) getRoute(method string, path string) (*node, map[string]string) {
+	searchParts := parsePattern(path)
+	params := make(map[string]string)
+
+	root, ok := r.roots[method] // 找到对应方法(如[GET])下的前缀路由树根节点
+	if !ok {
+		return nil, nil
+	}
+	n := root.search(searchParts, 0)
+
+	if n != nil {
+		parts := parsePattern(n.pattern)
+		for index, part := range parts {
+			if part[0] == ':' {
+				params[part[1:]] = searchParts[index]
+			}
+			if part[0] == '*' && len(part) > 1 {
+				params[part[1:]] = strings.Join(searchParts[index:], "/")
+				break
+			}
+		}
+		return n, params
+	}
+	return nil, nil
+}
+
+func (r *router) getRoutes(method string) []*node {
+	root, ok := r.roots[method]
+	if !ok {
+		return nil
+
+	}
+	nodes := make([]*node, 0)
+	root.travel(&nodes)
+	return nodes
+}
+
 func (r *router) handle(c *Context) {
-	key := c.Method + "-" + c.Path
-	if handler, ok := r.handlers[key]; ok {
-		handler(c)
+	n, params := r.getRoute(c.Method, c.Path)
+	if n != nil {
+		c.Params = params
+		log.Default().Println(c.Params)
+		key := c.Method + "-" + n.pattern
+		r.handlers[key](c)
 	} else {
 		c.String(http.StatusNotFound, "404 NOT FOUND: %s\n", c.Path)
 	}

@@ -13,18 +13,24 @@ type Context struct {
 	Writer http.ResponseWriter
 	Req    *http.Request
 	// origin objects
-	Path   string
 	Method string
+	Path   string
+	Params map[string]string
 	// response info
 	StatusCode int
+}
+
+func (c *Context) Param(key string) string {
+	value := c.Params[key]
+	return value
 }
 
 func newContext(w http.ResponseWriter, req *http.Request) *Context {
 	return &Context{
 		Writer: w,
 		Req:    req,
-		Path:   req.URL.Path,
 		Method: req.Method,
+		Path:   req.URL.Path,
 	}
 }
 
