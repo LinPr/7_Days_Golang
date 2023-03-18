@@ -17,3 +17,4 @@
 + The new group is added to the list of groups managed by the engine.
 
 7. 添加插件，通过一个闭包以及一个 index 来回调所有的插件
+8. 封装 net/http 自带的 http.Fileserver 将url中的path路由到静态文件

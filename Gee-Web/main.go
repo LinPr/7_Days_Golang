@@ -57,6 +57,7 @@ func main() {
 	e := gee.NewEngine()
 	e.Use(gee.Logger())  // global midlleware
 	e.Use(gee.Logger1()) // global midlleware
+	e.Static("/assert", "./static")
 	e.GET("/", func(c *gee.Context) {
 		c.HTML(http.StatusOK, "<h1>Hello Gee</h1>")
 	})

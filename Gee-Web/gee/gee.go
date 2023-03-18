@@ -1,8 +1,10 @@
 package gee
 
 import (
+	"fmt"
 	"log"
 	"net/http"
+	"path"
 	"strings"
 )
 
@@ -88,4 +90,29 @@ func (group *RouterGroup) GET(pattern string, handler HandlerFunc) {
 
 func (group *RouterGroup) POST(pattern string, handler HandlerFunc) {
 	group.addRoute("POST", pattern, handler)
+}
+
+// static file handler
+func (group *RouterGroup) createStaticHandler(relativePath string, fs http.FileSystem) HandlerFunc {
+	absolutePath := path.Join(group.prefix, relativePath)
+	// Register the file server handler
+	fileServer := http.StripPrefix(absolutePath, http.FileServer(fs))
+	fmt.Printf("absolutePath: %v\n", absolutePath)
+	return func(c *Context) {
+		file := c.Param("filepath")
+		if _, err := fs.Open(file); err != nil {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		fileServer.ServeHTTP(c.Writer, c.Req)
+	}
+}
+
+// server static files
+func (group *RouterGroup) Static(relativePath, root string) {
+	handler := group.createStaticHandler(relativePath, http.Dir(root))
+	urlPattern := path.Join(relativePath, "/*filepath")
+
+	//register GET handler
+	group.GET(urlPattern, handler)
 }
